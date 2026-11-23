@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ポケモン5文字当てクイズ（非公式）</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      background-color: #f8f9fa;
+      color: #212529;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 20px 10px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 5px;
+    }
+    .subtitle {
+      font-size: 0.85rem;
+      color: #6c757d;
+      margin-bottom: 20px;
+    }
+    /* 6行 × 5列のグリッド */
+    #board {
+      display: grid;
+      grid-template-rows: repeat(6, 1fr);
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .tile {
+      width: 52px;
+      height: 52px;
+      border: 2px solid #dee2e6;
+      background-color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      border-radius: 6px;
+      user-select: none;
+    }
+    /* 判定後の色 */
+    .correct { background-color: #6aaa64; color: white; border-color: #6aaa64; }
+    .present { background-color: #c9b458; color: white; border-color: #c9b458; }
+    .absent  { background-color: #787c7e; color: white; border-color: #787c7e; }
+
+    /* 入力エリア */
+    .input-area {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    input[type="text"] {
+      font-size: 1.2rem;
+      padding: 8px 12px;
+      width: 160px;
+      text-align: center;
+      border: 2px solid #adb5bd;
+      border-radius: 6px;
+    }
+    button {
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 8px 16px;
+      background-color: #3b4cca;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #2a3696; }
+
+    #message {
+      min-height: 24px;
+      font-weight: bold;
+      color: #d9534f;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    .win-msg { color: #2b8a3e !important; }
+
+    /* シェア・リスタートボタン */
+    .action-buttons {
+      display: none;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .share-btn { background-color: #1da1f2; }
+    .share-btn:hover { background-color: #0d8ddb; }
+    .reset-btn { background-color: #495057; }
+
+    footer {
+      margin-top: 30px;
+      font-size: 0.75rem;
+      color: #868e96;
+      text-align: center;
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>ポケモン5文字当てクイズ</h1>
+  <div class="subtitle">5文字のポケモン名を6回以内に当てよう！</div>
+
+  <div id="board"></div>
+
+  <div id="message"></div>
+
+  <div class="input-area" id="input-area">
+    <input type="text" id="guess-input" maxlength="5" placeholder="例：ピカチュウ" autocomplete="off">
+    <button id="submit-btn">決定</button>
+  </div>
+
+  <div class="action-buttons" id="action-buttons">
+    <button class="share-btn" id="share-btn">結果をコピー</button>
+    <button class="reset-btn" id="reset-btn">もう一回遊ぶ</button>
+  </div>
+
+  <footer>
+    非公式ファンメイドゲームです。
+  </footer>
+
+  <script>
+    // 5文字のポケモンリスト（お題＆入力チェック用）
+    const POKEMON_5_LIST = [
+      "フシギダネ", "フシギソウ", "リザードン", "カメックス",
+      "キャタピー", "トランセル", "バタフリー", "ピジョット",
+      "ピカチュウ", "ライチュウ", "サンドパン", "ニドリーナ",
+      "ニドクイン", "ニドリーノ", "ニドキング", "キュウコン",
+      "ゴルバット", "ナゾノクサ", "クサイハナ", "ラフレシア",
+      "パラセクト", "モルフォン", "ダグトリオ", "ペルシアン",
+      "ゴルダック", "オコリザル", "ウインディ", "ニョロボン",
+      "ユンゲラー", "フーディン", "ワンリキー", "ゴーリキー",
+      "カイリキー", "マダツボミ", "ウツボット", "メノクラゲ",
+      "ドククラゲ", "イシツブテ", "ゴローニャ", "ギャロップ",
+      "レアコイル", "ドードリオ", "ベトベター", "ベトベトン",
+      "シェルダー", "パルシェン", "スリーパー", "キングラー",
+      "ビリリダマ", "マルマイン", "サワムラー", "エビワラー",
+      "ベロリンガ", "マタドガス", "サイホーン", "モンジャラ",
+      "アズマオウ", "ヒトデマン", "スターミー", "バリヤード",
+      "ストライク", "ケンタロス", "コイキング", "ギャラドス",
+      "シャワーズ", "サンダース", "ブースター", "オムナイト",
+      "オムスター", "カブトプス", "フリーザー", "ファイヤー",
+      "ミニリュウ", "ハクリュー", "カイリュー", "ミュウツー",
+    ].filter(name => name.length === 5);
+
+    const MAX_TRIES = 6;
+    let targetWord = "";
+    let currentRow = 0;
+    let gameOver = false;
+    let emojiHistory = [];
+
+    const board = document.getElementById("board");
+    const input = document.getElementById("guess-input");
+    const submitBtn = document.getElementById("submit-btn");
+    const messageEl = document.getElementById("message");
+    const actionButtons = document.getElementById("action-buttons");
+    const inputArea = document.getElementById("input-area");
+
+    // ゲームの初期化
+    function initGame() {
+      board.innerHTML = "";
+      currentRow = 0;
+      gameOver = false;
+      emojiHistory = [];
+      messageEl.textContent = "";
+      messageEl.className = "";
+      input.value = "";
+      inputArea.style.display = "flex";
+      actionButtons.style.display = "none";
+
+      // 5文字リストからランダムに1匹選ぶ
+      targetWord = POKEMON_5_LIST[Math.floor(Math.random() * POKEMON_5_LIST.length)];
+
+      // 6×5のマス目を作成
+      for (let r = 0; r < MAX_TRIES; r++) {
+        const rowDiv = document.createElement("div");
+        rowDiv.className = "row";
+        for (let c = 0; c < 5; c++) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.id = `tile-${r}-${c}`;
+          rowDiv.appendChild(tile);
+        }
+        board.appendChild(rowDiv);
+      }
+      input.focus();
+    }
+
+    // 判定ロジック
+    function checkGuess() {
+      if (gameOver) return;
+
+      const guess = input.value.trim();
+
+      // 全角カタカナ5文字かチェック
+      if (!/^[ァ-ヶー]{5}$/.test(guess)) {
+        showMessage("全角カタカナ5文字で入力してね！");
+        return;
+      }
+
+      // 5文字リストに存在するかチェック（適当な文字を弾く）
+      if (!POKEMON_5_LIST.includes(guess)) {
+        showMessage("登録されている5文字のポケモン名を入力してね！");
+        return;
+      }
+
+      showMessage("");
+
+      const targetChars = targetWord.split("");
+      const guessChars = guess.split("");
+      const result = Array(5).fill("absent");
+      const targetUsed = Array(5).fill(false);
+
+      // 1パス目：場所も文字も一致（緑）
+      for (let i = 0; i < 5; i++) {
+        if (guessChars[i] === targetChars[i]) {
+          result[i] = "correct";
+          targetUsed[i] = true;
+        }
+      }
+
+      // 2パス目：文字だけ含まれる（黄）
+      for (let i = 0; i < 5; i++) {
+        if (result[i] === "correct") continue;
+        for (let j = 0; j < 5; j++) {
+          if (!targetUsed[j] && guessChars[i] === targetChars[j]) {
+            result[i] = "present";
+            targetUsed[j] = true;
+            break;
+          }
+        }
+      }
+
+      // マス目に反映＆絵文字記録
+      let rowEmoji = "";
+      for (let i = 0; i < 5; i++) {
+        const tile = document.getElementById(`tile-${currentRow}-${i}`);
+        tile.textContent = guessChars[i];
+        tile.classList.add(result[i]);
+
+        if (result[i] === "correct") rowEmoji += "🟩";
+        else if (result[i] === "present") rowEmoji += "🟨";
+        else rowEmoji += "⬜";
+      }
+      emojiHistory.push(rowEmoji);
+
+      // 判定
+      if (guess === targetWord) {
+        showMessage(`正解！「${targetWord}」でした！`, true);
+        endGame();
+      } else if (currentRow + 1 >= MAX_TRIES) {
+        showMessage(`残念！正解は「${targetWord}」でした。`);
+        endGame();
+      } else {
+        currentRow++;
+        input.value = "";
+        input.focus();
+      }
+    }
+
+    function showMessage(msg, isWin = false) {
+      messageEl.textContent = msg;
+      messageEl.className = isWin ? "win-msg" : "";
+    }
+
+    function endGame() {
+      gameOver = true;
+      inputArea.style.display = "none";
+      actionButtons.style.display = "flex";
+    }
+
+    // イベント設定
+    submitBtn.addEventListener("click", checkGuess);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") checkGuess();
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", initGame);
+
+    document.getElementById("share-btn").addEventListener("click", () => {
+      const score = messageEl.classList.contains("win-msg") ? `${currentRow + 1}/${MAX_TRIES}` : `X/${MAX_TRIES}`;
+      const shareText = `ポケモン5文字当てクイズ ${score}\n\n${emojiHistory.join("\n")}\n#ポケモン5文字当て`;
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert("結果をクリップボードにコピーしました！");
+      });
+    });
+
+    // 初回スタート
+    initGame();
+  </script>
+</body>
+</html>
