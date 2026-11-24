@@ -28,60 +28,6 @@
       margin-bottom: 15px;
       text-align: center;
     }
-    /* モード選択画面 */
-    #mode-select {
-      background: white;
-      padding: 25px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
-      text-align: center;
-      max-width: 360px;
-      width: 100%;
-    }
-    .mode-btn {
-      display: block;
-      width: 100%;
-      margin-bottom: 12px;
-      padding: 12px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      background-color: #3b4cca;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .mode-btn:hover { background-color: #2a3696; }
-    .secondary-mode-btn { background-color: #495057; }
-    .secondary-mode-btn:hover { background-color: #343a40; }
-
-    /* マルチ用ロビー画面 */
-    #multi-lobby {
-      display: none;
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
-      text-align: center;
-      max-width: 360px;
-      width: 100%;
-    }
-    .lobby-section {
-      margin-bottom: 15px;
-    }
-    .lobby-section h3 {
-      font-size: 1rem;
-      margin-bottom: 8px;
-    }
-
-    /* ゲーム画面（最初は隠す） */
-    #game-container {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-    }
     #room-info {
       font-size: 0.9rem;
       color: #3b4cca;
@@ -156,7 +102,7 @@
     }
     .win-msg { color: #2b8a3e !important; }
 
-    /* シェア・リスタート・戻るボタン */
+    /* シェア・リスタートボタン */
     .action-buttons {
       display: none;
       gap: 10px;
@@ -167,8 +113,29 @@
     .share-btn { background-color: #1da1f2; }
     .share-btn:hover { background-color: #0d8ddb; }
 
+    /* 下部マルチプレイエリア */
+    #multi-section {
+      margin-top: 25px;
+      background: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      max-width: 320px;
+      width: 100%;
+      text-align: center;
+    }
+    #multi-section h3 {
+      font-size: 0.95rem;
+      margin-top: 0;
+      margin-bottom: 10px;
+      color: #495057;
+    }
+    .multi-box {
+      margin-bottom: 12px;
+    }
+
     footer {
-      margin-top: 20px;
+      margin-top: 25px;
       font-size: 0.75rem;
       color: #868e96;
       text-align: center;
@@ -179,51 +146,38 @@
 <body>
 
   <h1>ポケモン当てられるかな？</h1>
+  <div id="room-info">👤 1人プレイモード</div>
+  <div class="subtitle" id="turn-indicator">5文字のポケモン名を12回以内に当てよう！</div>
 
-  <!-- 1. モード選択画面 -->
-  <div id="mode-select">
-    <div style="font-size: 1rem; font-weight: bold; margin-bottom: 15px;">モードを選んでね！</div>
-    <button class="mode-btn" id="to-solo-btn">👤 1人で遊ぶ</button>
-    <button class="mode-btn secondary-mode-btn" id="to-multi-btn">👥 みんなで遊ぶ（マルチ）</button>
+  <!-- ゲーム盤面 -->
+  <div id="board"></div>
+
+  <div id="message"></div>
+
+  <div class="input-area" id="input-area">
+    <input type="text" id="guess-input" maxlength="5" placeholder="例：ピカチュウ" autocomplete="off">
+    <button id="submit-btn">決定</button>
   </div>
 
-  <!-- 2. マルチプレイのロビー画面 -->
-  <div id="multi-lobby">
-    <div class="lobby-section">
-      <h3>🏠 部屋を作る（ホスト）</h3>
-      <button id="create-room-btn">部屋を作成する</button>
-      <div id="host-status" style="font-size:0.8rem; color:#666; margin-top:5px;"></div>
-    </div>
-    <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
-    <div class="lobby-section">
-      <h3>🚪 部屋に参加する（ゲスト）</h3>
-      <input type="text" id="room-id-input" placeholder="部屋IDを入力" style="width: 80%; margin-bottom: 5px;">
-      <br>
-      <button id="join-room-btn" class="sub-btn">部屋に参加する</button>
-    </div>
-    <div id="lobby-message" style="color: #d9534f; font-size: 0.85rem; margin-top: 10px;"></div>
-    <button class="sub-btn" id="back-to-mode-from-lobby" style="margin-top: 15px; font-size: 0.8rem;">← モード選択に戻る</button>
+  <div class="action-buttons" id="action-buttons">
+    <button class="share-btn" id="share-btn">結果をコピー</button>
+    <button class="sub-btn" id="reset-btn">もう一回遊ぶ</button>
+    <button class="sub-btn" id="leave-multi-btn" style="display:none;">1人プレイに戻る</button>
   </div>
 
-  <!-- 3. ゲーム画面 -->
-  <div id="game-container">
-    <div id="room-info"></div>
-    <div class="subtitle" id="turn-indicator">5文字のポケモン名を12回以内に当てよう！</div>
-
-    <div id="board"></div>
-
-    <div id="message"></div>
-
-    <div class="input-area" id="input-area">
-      <input type="text" id="guess-input" maxlength="5" placeholder="例：ピカチュウ" autocomplete="off">
-      <button id="submit-btn">決定</button>
+  <!-- 画面下部のマルチプレイ用エリア -->
+  <div id="multi-section">
+    <h3>👥 友達と一緒に遊ぶ（マルチプレイ）</h3>
+    <div class="multi-box">
+      <button id="create-room-btn" style="font-size:0.85rem; padding:6px 12px;">部屋を作る</button>
+      <div id="host-status" style="font-size:0.75rem; color:#666; margin-top:4px;"></div>
     </div>
-
-    <div class="action-buttons" id="action-buttons">
-      <button class="share-btn" id="share-btn">結果をコピー</button>
-      <button class="sub-btn" id="reset-btn">もう一回遊ぶ</button>
-      <button class="sub-btn" id="back-to-mode-btn">モード選択へ戻る</button>
+    <div style="border-top:1px solid #eee; margin:10px 0;"></div>
+    <div class="multi-box">
+      <input type="text" id="room-id-input" placeholder="部屋IDを入力" style="font-size:0.9rem; width: 130px; padding: 4px 8px;">
+      <button id="join-room-btn" class="sub-btn" style="font-size:0.85rem; padding:6px 10px;">参加する</button>
     </div>
+    <div id="lobby-message" style="color: #d9534f; font-size: 0.75rem; margin-top: 5px;"></div>
   </div>
 
   <footer>
@@ -249,9 +203,6 @@
     let emojiHistory = [];
 
     // DOM要素
-    const modeSelect = document.getElementById("mode-select");
-    const multiLobby = document.getElementById("multi-lobby");
-    const gameContainer = document.getElementById("game-container");
     const roomInfo = document.getElementById("room-info");
     const turnIndicator = document.getElementById("turn-indicator");
     const board = document.getElementById("board");
@@ -261,32 +212,8 @@
     const actionButtons = document.getElementById("action-buttons");
     const lobbyMessage = document.getElementById("lobby-message");
     const resetBtn = document.getElementById("reset-btn");
-
-    // モード選択ボタン
-    document.getElementById("to-solo-btn").addEventListener("click", () => {
-      isMulti = false;
-      modeSelect.style.display = "none";
-      gameContainer.style.display = "flex";
-      roomInfo.textContent = "👤 1人プレイモード";
-      initGame();
-    });
-
-    document.getElementById("to-multi-btn").addEventListener("click", () => {
-      modeSelect.style.display = "none";
-      multiLobby.style.display = "block";
-    });
-
-    document.getElementById("back-to-mode-from-lobby").addEventListener("click", () => {
-      multiLobby.style.display = "none";
-      modeSelect.style.display = "block";
-      if (peer) peer.destroy();
-    });
-
-    document.getElementById("back-to-mode-btn").addEventListener("click", () => {
-      gameContainer.style.display = "none";
-      modeSelect.style.display = "block";
-      if (peer) peer.destroy();
-    });
+    const leaveMultiBtn = document.getElementById("leave-multi-btn");
+    const multiSection = document.getElementById("multi-section");
 
     // マルチ：部屋作成
     document.getElementById("create-room-btn").addEventListener("click", () => {
@@ -336,9 +263,7 @@
     });
 
     function setupConnection() {
-      multiLobby.style.display = "none";
-      gameContainer.style.display = "flex";
-
+      multiSection.style.display = "none"; // マルチ中は下部メニューを隠す
       conn.on('data', (data) => {
         if (data.type === 'START') {
           targetWord = data.targetWord;
@@ -347,14 +272,22 @@
           updateTurnDisplay();
         } else if (data.type === 'GUESS') {
           processOpponentGuess(data.guess, data.result, data.row, data.isWin, data.isGameOver);
-        } else if (data.type === 'RESET') {
-          targetWord = data.newTarget;
-          initGame();
-          myTurn = isHost;
-          updateTurnDisplay();
         }
       });
     }
+
+    // 1人プレイに戻るボタン
+    leaveMultiBtn.addEventListener("click", () => {
+      if (peer) peer.destroy();
+      isMulti = false;
+      isHost = false;
+      myTurn = true;
+      multiSection.style.display = "block";
+      document.getElementById("host-status").textContent = "";
+      lobbyMessage.textContent = "";
+      document.getElementById("room-id-input").value = "";
+      initGame();
+    });
 
     // ゲーム初期化
     function initGame() {
@@ -366,14 +299,18 @@
       messageEl.className = "";
       input.value = "";
       actionButtons.style.display = "none";
-      resetBtn.style.display = isMulti ? "none" : "inline-block"; // マルチのときは「もう一回遊ぶ」を隠す（またはホスト制御に）
-
+      
       if (!isMulti) {
         targetWord = POKEMON_5_LIST[Math.floor(Math.random() * POKEMON_5_LIST.length)];
         roomInfo.textContent = "👤 1人プレイモード";
         turnIndicator.textContent = "5文字のポケモン名を12回以内に当てよう！";
+        resetBtn.style.display = "inline-block";
+        leaveMultiBtn.style.display = "none";
+        multiSection.style.display = "block";
       } else {
         roomInfo.textContent = isHost ? "🏠 マルチ（ホスト）" : "🚪 マルチ（ゲスト）";
+        resetBtn.style.display = "none";
+        leaveMultiBtn.style.display = "inline-block";
       }
 
       for (let r = 0; r < MAX_TRIES; r++) {
@@ -558,6 +495,9 @@
         alert("結果をクリップボードにコピーしました！");
       });
     });
+
+    // 初回起動時（1人プレイとしてスタート）
+    initGame();
   </script>
 </body>
 </html>
