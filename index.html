@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ポケモン5文字当てクイズ（非公式）</title>
+  <title>ポケモン当てられるかな？</title>
+  <!-- リアルタイム通信用のPeerJSライブラリ -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
     body {
       font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
@@ -18,35 +20,97 @@
     h1 {
       font-size: 1.5rem;
       margin-bottom: 5px;
+      text-align: center;
     }
     .subtitle {
       font-size: 0.85rem;
       color: #6c757d;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
+      text-align: center;
     }
-    /* 6行 × 5列のグリッド */
+    /* モード選択画面 */
+    #mode-select {
+      background: white;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      text-align: center;
+      max-width: 360px;
+      width: 100%;
+    }
+    .mode-btn {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      background-color: #3b4cca;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .mode-btn:hover { background-color: #2a3696; }
+    .secondary-mode-btn { background-color: #495057; }
+    .secondary-mode-btn:hover { background-color: #343a40; }
+
+    /* マルチ用ロビー画面 */
+    #multi-lobby {
+      display: none;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      text-align: center;
+      max-width: 360px;
+      width: 100%;
+    }
+    .lobby-section {
+      margin-bottom: 15px;
+    }
+    .lobby-section h3 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    /* ゲーム画面（最初は隠す） */
+    #game-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+    }
+    #room-info {
+      font-size: 0.9rem;
+      color: #3b4cca;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    /* 12行 × 5列のグリッド */
     #board {
       display: grid;
-      grid-template-rows: repeat(6, 1fr);
-      gap: 6px;
-      margin-bottom: 20px;
+      grid-template-rows: repeat(12, 1fr);
+      gap: 4px;
+      margin-bottom: 15px;
     }
     .row {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
+      gap: 4px;
     }
     .tile {
-      width: 52px;
-      height: 52px;
+      width: 40px;
+      height: 40px;
       border: 2px solid #dee2e6;
       background-color: #ffffff;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 1.5rem;
+      font-size: 1.2rem;
       font-weight: bold;
-      border-radius: 6px;
+      border-radius: 4px;
       user-select: none;
     }
     /* 判定後の色 */
@@ -61,17 +125,17 @@
       margin-bottom: 12px;
     }
     input[type="text"] {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       padding: 8px 12px;
-      width: 160px;
+      width: 150px;
       text-align: center;
       border: 2px solid #adb5bd;
       border-radius: 6px;
     }
     button {
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: bold;
-      padding: 8px 16px;
+      padding: 8px 14px;
       background-color: #3b4cca;
       color: white;
       border: none;
@@ -79,28 +143,32 @@
       cursor: pointer;
     }
     button:hover { background-color: #2a3696; }
+    .sub-btn { background-color: #495057; }
+    .sub-btn:hover { background-color: #343a40; }
 
     #message {
       min-height: 24px;
       font-weight: bold;
       color: #d9534f;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
       text-align: center;
+      font-size: 0.9rem;
     }
     .win-msg { color: #2b8a3e !important; }
 
-    /* シェア・リスタートボタン */
+    /* シェア・リスタート・戻るボタン */
     .action-buttons {
       display: none;
       gap: 10px;
       margin-bottom: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
     .share-btn { background-color: #1da1f2; }
     .share-btn:hover { background-color: #0d8ddb; }
-    .reset-btn { background-color: #495057; }
 
     footer {
-      margin-top: 30px;
+      margin-top: 20px;
       font-size: 0.75rem;
       color: #868e96;
       text-align: center;
@@ -110,65 +178,185 @@
 </head>
 <body>
 
-  <h1>ポケモン5文字当てクイズ</h1>
-  <div class="subtitle">5文字のポケモン名を6回以内に当てよう！</div>
+  <h1>ポケモン当てられるかな？</h1>
 
-  <div id="board"></div>
-
-  <div id="message"></div>
-
-  <div class="input-area" id="input-area">
-    <input type="text" id="guess-input" maxlength="5" placeholder="例：ピカチュウ" autocomplete="off">
-    <button id="submit-btn">決定</button>
+  <!-- 1. モード選択画面 -->
+  <div id="mode-select">
+    <div style="font-size: 1rem; font-weight: bold; margin-bottom: 15px;">モードを選んでね！</div>
+    <button class="mode-btn" id="to-solo-btn">👤 1人で遊ぶ</button>
+    <button class="mode-btn secondary-mode-btn" id="to-multi-btn">👥 みんなで遊ぶ（マルチ）</button>
   </div>
 
-  <div class="action-buttons" id="action-buttons">
-    <button class="share-btn" id="share-btn">結果をコピー</button>
-    <button class="reset-btn" id="reset-btn">もう一回遊ぶ</button>
+  <!-- 2. マルチプレイのロビー画面 -->
+  <div id="multi-lobby">
+    <div class="lobby-section">
+      <h3>🏠 部屋を作る（ホスト）</h3>
+      <button id="create-room-btn">部屋を作成する</button>
+      <div id="host-status" style="font-size:0.8rem; color:#666; margin-top:5px;"></div>
+    </div>
+    <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+    <div class="lobby-section">
+      <h3>🚪 部屋に参加する（ゲスト）</h3>
+      <input type="text" id="room-id-input" placeholder="部屋IDを入力" style="width: 80%; margin-bottom: 5px;">
+      <br>
+      <button id="join-room-btn" class="sub-btn">部屋に参加する</button>
+    </div>
+    <div id="lobby-message" style="color: #d9534f; font-size: 0.85rem; margin-top: 10px;"></div>
+    <button class="sub-btn" id="back-to-mode-from-lobby" style="margin-top: 15px; font-size: 0.8rem;">← モード選択に戻る</button>
+  </div>
+
+  <!-- 3. ゲーム画面 -->
+  <div id="game-container">
+    <div id="room-info"></div>
+    <div class="subtitle" id="turn-indicator">5文字のポケモン名を12回以内に当てよう！</div>
+
+    <div id="board"></div>
+
+    <div id="message"></div>
+
+    <div class="input-area" id="input-area">
+      <input type="text" id="guess-input" maxlength="5" placeholder="例：ピカチュウ" autocomplete="off">
+      <button id="submit-btn">決定</button>
+    </div>
+
+    <div class="action-buttons" id="action-buttons">
+      <button class="share-btn" id="share-btn">結果をコピー</button>
+      <button class="sub-btn" id="reset-btn">もう一回遊ぶ</button>
+      <button class="sub-btn" id="back-to-mode-btn">モード選択へ戻る</button>
+    </div>
   </div>
 
   <footer>
-    非公式ファンメイドゲームです。
+    非公式ファンメイドゲーム
   </footer>
 
   <script>
-    // 5文字のポケモンリスト（お題＆入力チェック用）
+    // あなたが作ってくれたポケモンリスト
     const POKEMON_5_LIST = [
-      "フシギダネ", "フシギソウ", "リザードン", "カメックス",
-      "キャタピー", "トランセル", "バタフリー", "ピジョット",
-      "ピカチュウ", "ライチュウ", "サンドパン", "ニドリーナ",
-      "ニドクイン", "ニドリーノ", "ニドキング", "キュウコン",
-      "ゴルバット", "ナゾノクサ", "クサイハナ", "ラフレシア",
-      "パラセクト", "モルフォン", "ダグトリオ", "ペルシアン",
-      "ゴルダック", "オコリザル", "ウインディ", "ニョロボン",
-      "ユンゲラー", "フーディン", "ワンリキー", "ゴーリキー",
-      "カイリキー", "マダツボミ", "ウツボット", "メノクラゲ",
-      "ドククラゲ", "イシツブテ", "ゴローニャ", "ギャロップ",
-      "レアコイル", "ドードリオ", "ベトベター", "ベトベトン",
-      "シェルダー", "パルシェン", "スリーパー", "キングラー",
-      "ビリリダマ", "マルマイン", "サワムラー", "エビワラー",
-      "ベロリンガ", "マタドガス", "サイホーン", "モンジャラ",
-      "アズマオウ", "ヒトデマン", "スターミー", "バリヤード",
-      "ストライク", "ケンタロス", "コイキング", "ギャラドス",
-      "シャワーズ", "サンダース", "ブースター", "オムナイト",
-      "オムスター", "カブトプス", "フリーザー", "ファイヤー",
-      "ミニリュウ", "ハクリュー", "カイリュー", "ミュウツー",
+      "フシギダネ","フシギソウ","フシギバナ","リザードン","カメックス","キャタピー","トランセル","バタフリー","ピジョット","オニスズメ","オニドリル","アーボック","ピカチュウ","ライチュウ","サンドパン","ニドラン♀","ニドリーナ","ニドクイン","ニドラン♂","ニドリーノ","ニドキング","キュウコン","ゴルバット","ナゾノクサ","クサイハナ","ラフレシア","パラセクト","モルフォン","ダグトリオ","ペルシアン","ゴルダック","オコリザル","ウインディ","ニョロボン","ユンゲラー","フーディン","ワンリキー","ゴーリキー","カイリキー","マダツボミ","ウツボット","メノクラゲ","ドククラゲ","イシツブテ","ゴローニャ","ギャロップ","レアコイル","ドードリオ","ベトベター","ベトベトン","シェルダー","パルシェン","スリーパー","キングラー","ビリリダマ","マルマイン","サワムラー","エビワラー","ベロリンガ","マタドガス","サイホーン","モンジャラ","トサキント","アズマオウ","ヒトデマン","スターミー","バリヤード","ストライク","ルージュラ","ケンタロス","コイキング","ギャラドス","シャワーズ","サンダース","ブースター","オムナイト","オムスター","カブトプス","フリーザー","ファイヤー","ミニリュウ","ハクリュー","カイリュー","ミュウツー","チコリータ","ベイリーフ","メガニウム","ヒノアラシ","マグマラシ","バクフーン","アリゲイツ","オーダイル","ヨルノズク","レディアン","アリアドス","クロバット","チョンチー","ランターン","トゲチック","ネイティオ","デンリュウ","キレイハナ","ウソッキー","ニョロトノ","ヒマナッツ","ヤンヤンマ","ブラッキー","ヤミカラス","ヤドキング","アンノーン","ソーナンス","キリンリキ","クヌギダマ","フォレトス","グライガー","ハガネール","グランブル","ハリーセン","ヘラクロス","マグマッグ","マグカルゴ","テッポウオ","デリバード","マンタイン","エアームド","キングドラ","ドンファン","ポリゴン2","カポエラー","ムチュール","エレキッド","ミルタンク","ヨーギラス","サナギラス","バンギラス","ジュプトル","ジュカイン","ワカシャモ","バシャーモ","ミズゴロウ","ヌマクロー","ラグラージ","ジグザグマ","マッスグマ","カラサリス","アゲハント","ドクケイル","ハスブレロ","ルンパッパ","ダーテング","オオスバメ","ペリッパー","サーナイト","アメモース","キノガッサ","ヤルキモノ","ケッキング","テッカニン","ゴニョニョ","バクオング","マクノシタ","ハリテヤマ","エネコロロ","ボスゴドラ","チャーレム","ライボルト","バルビート","イルミーゼ","マルノーム","サメハダー","ホエルオー","ブーピッグ","パッチール","ナックラー","ビブラーバ","フライゴン","チルタリス","ザングース","ハブネーク","ルナトーン","ソルロック","ドジョッチ","シザリガー","ネンドール","ユレイドル","アーマルド","ミロカロス","カクレオン","カゲボウズ","ジュペッタ","サマヨール","トロピウス","ユキワラシ","オニゴーリ","タマザラシ","トドグラー","トドゼルガ","ハンテール","サクラビス","ジーランス","ボーマンダ","メタグロス","レジロック","レジアイス","レジスチル","ラティアス","ラティオス","カイオーガ","グラードン","レックウザ","デオキシス","ハヤシガメ","ドダイトス","モウカザル","ゴウカザル","ポッチャマ","ポッタイシ","エンペルト","ムクバード","ムクホーク","コロボーシ","コロトック","レントラー","ロズレイド","ズガイドス","ラムパルド","タテトプス","トリデプス","ミノムッチ","ミノマダム","ガーメイル","ミツハニー","ビークイン","フローゼル","チェリンボ","カラナクシ","トリトドン","エテボース","フワライド","ミミロップ","ムウマージ","ドンカラス","ニャルマー","ブニャット","リーシャン","スカンプー","スカタンク","ドーミラー","ドータクン","ガブリアス","ヒポポタス","カバルドン","ドラピオン","グレッグル","ドクロッグ","マスキッパ","ケイコウオ","ネオラント","ユキカブリ","ユキノオー","マニューラ","ジバコイル","ベロベルト","ドサイドン","モジャンボ","エレキブル","ブーバーン","トゲキッス","メガヤンマ","リーフィア","グレイシア","グライオン","ポリゴンZ","エルレイド","ダイノーズ","ヨノワール","ユキメノコ","エムリット","ディアルガ","ヒードラン","レジギガス","ギラティナ","クレセリア","ダークライ","アルセウス","ビクティニ","ツタージャ","ジャノビー","ジャローダ","チャオブー","エンブオー","ミジュマル","フタチマル","ダイケンキ","ミルホッグ","ヨーテリー","ハーデリア","ムーランド","チョロネコ","レパルダス","ヤナッキー","バオッキー","ヒヤッキー","ムシャーナ","ハトーボー","ケンホロウ","ゼブライカ","ギガイアス","ココロモリ","モグリュー","ドリュウズ","ドッコラー","ドテッコツ","ローブシン","ガマゲロゲ","ハハコモリ","ペンドラー","エルフーン","ドレディア","ワルビアル","ダルマッカ","ヒヒダルマ","マラカッチ","イシズマイ","イワパレス","ズルズキン","シンボラー","デスカーン","プロトーガ","アバゴーラ","アーケオス","ヤブクロン","ダストダス","ゾロアーク","チラーミィ","チラチーノ","ゴチルゼル","ランクルス","コアルヒー","バニプッチ","バニリッチ","バイバニラ","メブキジカ","シュバルゴ","タマゲタケ","モロバレル","ブルンゲル","ママンボウ","デンチュラ","テッシード","ナットレイ","ギギギアル","シビシラス","シビビール","シビルドン","ランプラー","シャンデラ","オノノクス","クマシュン","ツンベアー","フリージオ","チョボマキ","アギルダー","コジョフー","コジョンド","クリムガン","キリキザン","バッフロン","ウォーグル","バルチャイ","バルジーナ","クイタラン","アイアント","サザンドラ","ウルガモス","コバルオン","テラキオン","ビリジオン","トルネロス","ボルトロス","ランドロス","ケルディオ","メロエッタ","ゲノセクト","ハリマロン","ハリボーグ","ブリガロン","テールナー","ゲコガシラ","ゲッコウガ","ヒノヤコマ","コフキムシ","コフーライ","カエンジシ","フラエッテ","メェークル","ゴーゴート","ヤンチャム","トリミアン","ニャスパー","ニダンギル","ギルガルド","シュシュプ","フレフワン","ペロッパフ","ペロリーム","マーイーカ","カラマネロ","ガメノデス","ドラミドロ","ウデッポウ","ブロスター","エリキテル","エレザード","ガチゴラス","アマルルガ","ニンフィア","ルチャブル","ヌメルゴン","クレッフィ","オーロット","バケッチャ","パンプジン","カチコール","クレベース","オンバット","オンバーン","ゼルネアス","イベルタル","フクスロー","ニャヒート","ガオガエン","オシャマリ","アシレーヌ","ケララッパ","ドデカバシ","ヤングース","デカグース","アゴジムシ","デンヂムシ","クワガノン","マケンカニ","ケケンカニ","オドリドリ","アブリボン","ルガルガン","ドヒドイデ","ドロバンコ","バンバドロ","ラランテス","マシェード","ヤトウモリ","ヌイコグマ","キテルグマ","アママイコ","アマージョ","キュワワー","コソクムシ","シロデスナ","ナマコブシ","ネッコアラ","バクガメス","トゲデマル","ミミッキュ","ハギギシリ","ジジーロン","ジャランゴ","コスモッグ","コスモウム","ソルガレオ","ルナアーラ","ウツロイド","テッカグヤ","カミツルギ","ネクロズマ","アーゴヨン","ズガドーン","メルメタル","バチンキー","ラビフット","ジメレオン","ホシガリス","ヨクバリス","アオガラス","サッチムシ","レドームシ","ワタシラガ","カジリガメ","パルスワン","トロッゴン","カジッチュ","タルップル","サダイジャ","サシカマス","マルヤクデ","オトスパス","ポットデス","ブリムオン","オーロンゲ","サニゴーン","バリコオル","デスバーン","マホイップ","タイレーツ","バチンウニ","コオリッポ","イエッサン","ドラメシヤ","ドラパルト","ザマゼンタ","ウーラオス","レジエレキ","レジドラゴ","ブリザポス","レイスポス","イダイトウ","ハリーマン","ラブトロス","ニャローテ","アチゲータ","ウェルカモ","ワナイダー","マメバッタ","パーモット","パピモッチ","オリーニョ","オリーヴァ","イキリンコ","ハラバリー","タギングル","ノノクラゲ","リククラゲ","カプサイジ","カヌチャン","ウミトリオ","オトシドリ","ナミイルカ","イルカマン","モトトカゲ","キラフロル","ハカドッグ","カラミンゴ","アルクジラ","ハルクジラ","ミガルーサ","シャリタツ","コノヨザル","リキキリン","ノココッチ","ドドゲザン","セグレイブ","コレクレー","サーフゴー","パオジアン","ディンルー","コライドン","ミライドン","カミッチュ","ヤバソチャ","イイネイヌ","マシマシラ","キチキギス","オーガポン","テラパゴス","モモワロウ"
     ].filter(name => name.length === 5);
 
-    const MAX_TRIES = 6;
+    const MAX_TRIES = 12;
+    let isMulti = false;
+    let peer = null;
+    let conn = null;
+    let isHost = false;
+    let myTurn = true;
+
     let targetWord = "";
     let currentRow = 0;
     let gameOver = false;
     let emojiHistory = [];
 
+    // DOM要素
+    const modeSelect = document.getElementById("mode-select");
+    const multiLobby = document.getElementById("multi-lobby");
+    const gameContainer = document.getElementById("game-container");
+    const roomInfo = document.getElementById("room-info");
+    const turnIndicator = document.getElementById("turn-indicator");
     const board = document.getElementById("board");
     const input = document.getElementById("guess-input");
     const submitBtn = document.getElementById("submit-btn");
     const messageEl = document.getElementById("message");
     const actionButtons = document.getElementById("action-buttons");
-    const inputArea = document.getElementById("input-area");
+    const lobbyMessage = document.getElementById("lobby-message");
+    const resetBtn = document.getElementById("reset-btn");
 
-    // ゲームの初期化
+    // モード選択ボタン
+    document.getElementById("to-solo-btn").addEventListener("click", () => {
+      isMulti = false;
+      modeSelect.style.display = "none";
+      gameContainer.style.display = "flex";
+      roomInfo.textContent = "👤 1人プレイモード";
+      initGame();
+    });
+
+    document.getElementById("to-multi-btn").addEventListener("click", () => {
+      modeSelect.style.display = "none";
+      multiLobby.style.display = "block";
+    });
+
+    document.getElementById("back-to-mode-from-lobby").addEventListener("click", () => {
+      multiLobby.style.display = "none";
+      modeSelect.style.display = "block";
+      if (peer) peer.destroy();
+    });
+
+    document.getElementById("back-to-mode-btn").addEventListener("click", () => {
+      gameContainer.style.display = "none";
+      modeSelect.style.display = "block";
+      if (peer) peer.destroy();
+    });
+
+    // マルチ：部屋作成
+    document.getElementById("create-room-btn").addEventListener("click", () => {
+      isMulti = true;
+      isHost = true;
+      peer = new Peer();
+      
+      peer.on('open', (id) => {
+        document.getElementById("host-status").textContent = `部屋ID: ${id} （共有してね）`;
+        lobbyMessage.textContent = "参加者を待っています...";
+      });
+
+      peer.on('connection', (connection) => {
+        conn = connection;
+        setupConnection();
+        targetWord = POKEMON_5_LIST[Math.floor(Math.random() * POKEMON_5_LIST.length)];
+        initGame();
+        myTurn = true;
+        updateTurnDisplay();
+        
+        conn.on('open', () => {
+          conn.send({ type: 'START', targetWord: targetWord });
+        });
+      });
+    });
+
+    // マルチ：部屋参加
+    document.getElementById("join-room-btn").addEventListener("click", () => {
+      const roomId = document.getElementById("room-id-input").value.trim();
+      if (!roomId) {
+        lobbyMessage.textContent = "部屋IDを入力してね";
+        return;
+      }
+
+      isMulti = true;
+      isHost = false;
+      peer = new Peer();
+
+      peer.on('open', () => {
+        conn = peer.connect(roomId);
+        setupConnection();
+      });
+
+      peer.on('error', (err) => {
+        lobbyMessage.textContent = "部屋が見つかりませんでした。IDを確認してね";
+      });
+    });
+
+    function setupConnection() {
+      multiLobby.style.display = "none";
+      gameContainer.style.display = "flex";
+
+      conn.on('data', (data) => {
+        if (data.type === 'START') {
+          targetWord = data.targetWord;
+          initGame();
+          myTurn = false;
+          updateTurnDisplay();
+        } else if (data.type === 'GUESS') {
+          processOpponentGuess(data.guess, data.result, data.row, data.isWin, data.isGameOver);
+        } else if (data.type === 'RESET') {
+          targetWord = data.newTarget;
+          initGame();
+          myTurn = isHost;
+          updateTurnDisplay();
+        }
+      });
+    }
+
+    // ゲーム初期化
     function initGame() {
       board.innerHTML = "";
       currentRow = 0;
@@ -177,13 +365,17 @@
       messageEl.textContent = "";
       messageEl.className = "";
       input.value = "";
-      inputArea.style.display = "flex";
       actionButtons.style.display = "none";
+      resetBtn.style.display = isMulti ? "none" : "inline-block"; // マルチのときは「もう一回遊ぶ」を隠す（またはホスト制御に）
 
-      // 5文字リストからランダムに1匹選ぶ
-      targetWord = POKEMON_5_LIST[Math.floor(Math.random() * POKEMON_5_LIST.length)];
+      if (!isMulti) {
+        targetWord = POKEMON_5_LIST[Math.floor(Math.random() * POKEMON_5_LIST.length)];
+        roomInfo.textContent = "👤 1人プレイモード";
+        turnIndicator.textContent = "5文字のポケモン名を12回以内に当てよう！";
+      } else {
+        roomInfo.textContent = isHost ? "🏠 マルチ（ホスト）" : "🚪 マルチ（ゲスト）";
+      }
 
-      // 6×5のマス目を作成
       for (let r = 0; r < MAX_TRIES; r++) {
         const rowDiv = document.createElement("div");
         rowDiv.className = "row";
@@ -198,19 +390,44 @@
       input.focus();
     }
 
-    // 判定ロジック
-    function checkGuess() {
+    function updateTurnDisplay() {
       if (gameOver) return;
+      if (!isMulti) {
+        turnIndicator.textContent = "5文字のポケモン名を12回以内に当てよう！";
+        input.disabled = false;
+        submitBtn.disabled = false;
+        return;
+      }
+
+      if (myTurn) {
+        turnIndicator.textContent = "✨ あなたのターンです！ポケモンを入力してください";
+        input.disabled = false;
+        submitBtn.disabled = false;
+        input.focus();
+      } else {
+        turnIndicator.textContent = "⏳ 相手の入力中...";
+        input.disabled = true;
+        submitBtn.disabled = true;
+      }
+    }
+
+    // 決定ボタン
+    submitBtn.addEventListener("click", submitGuess);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitGuess();
+    });
+
+    function submitGuess() {
+      if (gameOver) return;
+      if (isMulti && !myTurn) return;
 
       const guess = input.value.trim();
 
-      // 全角カタカナ5文字かチェック
       if (!/^[ァ-ヶー]{5}$/.test(guess)) {
         showMessage("全角カタカナ5文字で入力してね！");
         return;
       }
 
-      // 5文字リストに存在するかチェック（適当な文字を弾く）
       if (!POKEMON_5_LIST.includes(guess)) {
         showMessage("登録されている5文字のポケモン名を入力してね！");
         return;
@@ -218,20 +435,85 @@
 
       showMessage("");
 
-      const targetChars = targetWord.split("");
+      const result = evaluateGuess(guess, targetWord);
+      renderGuess(currentRow, guess, result);
+
+      let rowEmoji = "";
+      for(let i=0; i<5; i++) {
+        if (result[i] === "correct") rowEmoji += "🟩";
+        else if (result[i] === "present") rowEmoji += "🟨";
+        else rowEmoji += "⬜";
+      }
+      emojiHistory.push(rowEmoji);
+
+      let isWin = (guess === targetWord);
+      let isOver = isWin || (currentRow + 1 >= MAX_TRIES);
+
+      if (isMulti) {
+        conn.send({
+          type: 'GUESS',
+          guess: guess,
+          result: result,
+          row: currentRow,
+          isWin: isWin,
+          isGameOver: isOver
+        });
+      }
+
+      if (isWin) {
+        showMessage(`正解！「${targetWord}」でした！`, true);
+        endGame();
+      } else if (isOver) {
+        showMessage(`残念！正解は「${targetWord}」でした。`);
+        endGame();
+      } else {
+        currentRow++;
+        input.value = "";
+        if (isMulti) {
+          myTurn = false;
+          updateTurnDisplay();
+        } else {
+          input.focus();
+        }
+      }
+    }
+
+    function processOpponentGuess(guess, result, row, isWin, isGameOver) {
+      renderGuess(row, guess, result);
+
+      let rowEmoji = "";
+      for(let i=0; i<5; i++) {
+        if (result[i] === "correct") rowEmoji += "🟩";
+        else if (result[i] === "present") rowEmoji += "🟨";
+        else rowEmoji += "⬜";
+      }
+      emojiHistory.push(rowEmoji);
+
+      if (isWin) {
+        showMessage(`相手が正解しました！「${targetWord}」でした！`, true);
+        endGame();
+      } else if (isGameOver) {
+        showMessage(`ゲームオーバー！正解は「${targetWord}」でした。`);
+        endGame();
+      } else {
+        currentRow = row + 1;
+        myTurn = true;
+        updateTurnDisplay();
+      }
+    }
+
+    function evaluateGuess(guess, target) {
+      const targetChars = target.split("");
       const guessChars = guess.split("");
       const result = Array(5).fill("absent");
       const targetUsed = Array(5).fill(false);
 
-      // 1パス目：場所も文字も一致（緑）
       for (let i = 0; i < 5; i++) {
         if (guessChars[i] === targetChars[i]) {
           result[i] = "correct";
           targetUsed[i] = true;
         }
       }
-
-      // 2パス目：文字だけ含まれる（黄）
       for (let i = 0; i < 5; i++) {
         if (result[i] === "correct") continue;
         for (let j = 0; j < 5; j++) {
@@ -242,31 +524,15 @@
           }
         }
       }
+      return result;
+    }
 
-      // マス目に反映＆絵文字記録
-      let rowEmoji = "";
+    function renderGuess(row, guess, result) {
+      const guessChars = guess.split("");
       for (let i = 0; i < 5; i++) {
-        const tile = document.getElementById(`tile-${currentRow}-${i}`);
+        const tile = document.getElementById(`tile-${row}-${i}`);
         tile.textContent = guessChars[i];
         tile.classList.add(result[i]);
-
-        if (result[i] === "correct") rowEmoji += "🟩";
-        else if (result[i] === "present") rowEmoji += "🟨";
-        else rowEmoji += "⬜";
-      }
-      emojiHistory.push(rowEmoji);
-
-      // 判定
-      if (guess === targetWord) {
-        showMessage(`正解！「${targetWord}」でした！`, true);
-        endGame();
-      } else if (currentRow + 1 >= MAX_TRIES) {
-        showMessage(`残念！正解は「${targetWord}」でした。`);
-        endGame();
-      } else {
-        currentRow++;
-        input.value = "";
-        input.focus();
       }
     }
 
@@ -277,17 +543,13 @@
 
     function endGame() {
       gameOver = true;
-      inputArea.style.display = "none";
+      turnIndicator.textContent = "ゲーム終了！お疲れさまでした 🎉";
+      document.getElementById("input-area").style.display = "none";
       actionButtons.style.display = "flex";
     }
 
-    // イベント設定
-    submitBtn.addEventListener("click", checkGuess);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") checkGuess();
-    });
-
-    document.getElementById("reset-btn").addEventListener("click", initGame);
+    // 1人用のもう一回遊ぶボタン
+    resetBtn.addEventListener("click", initGame);
 
     document.getElementById("share-btn").addEventListener("click", () => {
       const score = messageEl.classList.contains("win-msg") ? `${currentRow + 1}/${MAX_TRIES}` : `X/${MAX_TRIES}`;
@@ -296,9 +558,6 @@
         alert("結果をクリップボードにコピーしました！");
       });
     });
-
-    // 初回スタート
-    initGame();
   </script>
 </body>
 </html>
