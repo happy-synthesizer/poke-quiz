@@ -688,7 +688,7 @@
 
     document.getElementById("share-btn").addEventListener("click", () => {
       const score = messageEl.classList.contains("win-msg") ? `${currentRow + 1}/${MAX_TRIES}` : `X/${MAX_TRIES}`;
-      const shareText = `ポケモン5文字当てクイズ ${score}\n\n${emojiHistory.join("\n")}\n#ポケモン5文字当て`;
+      const shareText = `${score}\n\n${emojiHistory.join("\n")}`;
       navigator.clipboard.writeText(shareText).then(() => {
         alert("結果をクリップボードにコピーしました！");
       });
